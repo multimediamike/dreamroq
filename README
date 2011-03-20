@@ -85,6 +85,11 @@ The library only does video playback; no sound right now.
 The video decoder is not 100% correct yet. You will likely notice a few
 artifacts which need to be ironed out.
 
+Many of the video rendering modes could be optimized slightly by copying
+pairs of pixels as 32-bit units. This should work on any mode except motion
+compensated blocks; the latter could experience alignment issues which
+the DC's SH-4 can't handle.
+
 The library is a tad slow. Profiling indicates that the main bottleneck
 is loading data from disc; the video decoder itself is pretty fast. The
 player might benefit by moving data loading (I/O-bound operation) into a 
@@ -96,7 +101,7 @@ The player is just a proof of concept at this point. It doesn't try to
 render frames with proper timing-- it just plays them as fast as possible
 (which often isn't very fast, mostly due to the I/O bottleneck).
 
-If the RoQ video is taller than it is wide, except some odd rendering.
+If the RoQ video is taller than it is wide, expect some odd rendering.
 
 The API between the library and the client app leaves a bit to be desired.
 Notably absent is some proper initialization and teardown mechanism.

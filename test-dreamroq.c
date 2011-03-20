@@ -22,7 +22,7 @@ int render_cb(unsigned short *buf, int width, int height, int stride,
     int x, y, pixel;
 
     sprintf(filename, "%04d.pnm", count++);
-    printf("writing frame %d file %s\n", count, filename);
+    printf("writing frame %d to file %s\n", count, filename);
     out = fopen(filename, "wb");
     if (!out)
         return ROQ_CLIENT_PROBLEM;
