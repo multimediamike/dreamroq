@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    status = dreamroq_play(argv[1], 1, render_cb, quit_cb);
+    status = dreamroq_play(argv[1], 0, render_cb, quit_cb);
     printf("final status = %d\n", status);
 
     return status;
