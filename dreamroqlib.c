@@ -137,7 +137,7 @@ static int roq_unpack_quad_codebook(unsigned char *buf, int size, int arg,
     mode_count -= 2; \
     mode = (mode_set >> mode_count) & 0x03;
 
-static int roq_unpack_vq(unsigned char *buf, int size, int arg, 
+static int roq_unpack_vq(unsigned char *buf, int size, unsigned int arg, 
     roq_state *state)
 {
     int status = ROQ_SUCCESS;
@@ -157,8 +157,12 @@ static int roq_unpack_vq(unsigned char *buf, int size, int arg,
     int subblock_offset;
 
     unsigned short *this_ptr;
+    unsigned int *this_ptr32;
     unsigned short *last_ptr;
-    unsigned short *vector;
+    unsigned int *last_ptr32;
+    unsigned short *vector16;
+    unsigned int *vector32;
+    int stride32 = stride / 2;
 
     /* bytestream management */
     int index = 0;
@@ -168,7 +172,7 @@ static int roq_unpack_vq(unsigned char *buf, int size, int arg,
 
     /* vectors */
     int mx, my;
-    signed char motion_x, motion_y;
+    int motion_x, motion_y;
     unsigned char data_byte;
 
     mx = (arg >> 8) & 0xFF;
@@ -200,26 +204,12 @@ static int roq_unpack_vq(unsigned char *buf, int size, int arg,
                 GET_MODE();
                 switch (mode)
                 {
-                case 0:  /* MOT: skip (copy from previous frame) */
-                    last_ptr = last_frame + block_offset;
-                    this_ptr = this_frame + block_offset;
-                    for (i = 0; i < 8; i++)
-                    {
-                        *this_ptr++ = *last_ptr++;
-                        *this_ptr++ = *last_ptr++;
-                        *this_ptr++ = *last_ptr++;
-                        *this_ptr++ = *last_ptr++;
-                        *this_ptr++ = *last_ptr++;
-                        *this_ptr++ = *last_ptr++;
-                        *this_ptr++ = *last_ptr++;
-                        *this_ptr++ = *last_ptr++;
-
-                        last_ptr += stride - 8;
-                        this_ptr += stride - 8;
-                    }
+                case 0:  /* MOT: skip */
                     break;
 
                 case 1:  /* FCC: motion compensation */
+                    /* this needs to be done 16 bits at a time due to
+                     * data alignment issues on the SH-4 */
                     GET_BYTE(data_byte);
                     motion_x = 8 - (data_byte >>  4) - mx;
                     motion_y = 8 - (data_byte & 0xF) - my;
@@ -244,16 +234,16 @@ static int roq_unpack_vq(unsigned char *buf, int size, int arg,
 
                 case 2:  /* SLD: upsample 4x4 vector */
                     GET_BYTE(data_byte);
-                    vector = state->cb4x4[data_byte];
+                    vector16 = state->cb4x4[data_byte];
                     for (i = 0; i < 4*4; i++)
                     {
                         this_ptr = this_frame + block_offset +
                             (i / 4 * 2 * stride) + (i % 4 * 2);
-                        this_ptr[0] = *vector;
-                        this_ptr[1] = *vector;
-                        this_ptr[stride+0] = *vector;
-                        this_ptr[stride+1] = *vector;
-                        vector++;
+                        this_ptr[0] = *vector16;
+                        this_ptr[1] = *vector16;
+                        this_ptr[stride+0] = *vector16;
+                        this_ptr[stride+1] = *vector16;
+                        vector16++;
                     }
                     break;
 
@@ -265,19 +255,7 @@ static int roq_unpack_vq(unsigned char *buf, int size, int arg,
                         GET_MODE();
                         switch (mode)
                         {
-                        case 0:  /* MOT: skip (copy from previous frame) */
-                            last_ptr = last_frame + subblock_offset;
-                            this_ptr = this_frame + subblock_offset;
-                            for (i = 0; i < 4; i++)
-                            {
-                                *this_ptr++ = *last_ptr++;
-                                *this_ptr++ = *last_ptr++;
-                                *this_ptr++ = *last_ptr++;
-                                *this_ptr++ = *last_ptr++;
-
-                                last_ptr += stride - 4;
-                                this_ptr += stride - 4;
-                            }
+                        case 0:  /* MOT: skip */
                             break;
 
                         case 1:  /* FCC: motion compensation */
@@ -301,50 +279,49 @@ static int roq_unpack_vq(unsigned char *buf, int size, int arg,
 
                         case 2:  /* SLD: use 4x4 vector from codebook */
                             GET_BYTE(data_byte);
-                            vector = state->cb4x4[data_byte];
-                            this_ptr = this_frame + subblock_offset;
+                            vector32 = (unsigned int*)state->cb4x4[data_byte];
+                            this_ptr32 = (unsigned int*)this_frame;
+                            this_ptr32 += subblock_offset / 2;
                             for (i = 0; i < 4; i++)
                             {
-                                *this_ptr++ = *vector++;
-                                *this_ptr++ = *vector++;
-                                *this_ptr++ = *vector++;
-                                *this_ptr++ = *vector++;
+                                *this_ptr32++ = *vector32++;
+                                *this_ptr32++ = *vector32++;
 
-                                this_ptr += stride - 4;
+                                this_ptr32 += stride32 - 2;
                             }
                             break;
 
                         case 3:  /* CCC: subdivide into 4 subblocks */
                             GET_BYTE(data_byte);
-                            vector = state->cb2x2[data_byte];
+                            vector16 = state->cb2x2[data_byte];
                             this_ptr = this_frame + subblock_offset;
-                            this_ptr[0] = vector[0];
-                            this_ptr[1] = vector[1];
-                            this_ptr[stride+0] = vector[2];
-                            this_ptr[stride+1] = vector[3];
+                            this_ptr[0] = vector16[0];
+                            this_ptr[1] = vector16[1];
+                            this_ptr[stride+0] = vector16[2];
+                            this_ptr[stride+1] = vector16[3];
 
                             GET_BYTE(data_byte);
-                            vector = state->cb2x2[data_byte];
-                            this_ptr[2] = vector[0];
-                            this_ptr[3] = vector[1];
-                            this_ptr[stride+2] = vector[2];
-                            this_ptr[stride+3] = vector[3];
+                            vector16 = state->cb2x2[data_byte];
+                            this_ptr[2] = vector16[0];
+                            this_ptr[3] = vector16[1];
+                            this_ptr[stride+2] = vector16[2];
+                            this_ptr[stride+3] = vector16[3];
 
                             this_ptr += stride * 2;
 
                             GET_BYTE(data_byte);
-                            vector = state->cb2x2[data_byte];
-                            this_ptr[0] = vector[0];
-                            this_ptr[1] = vector[1];
-                            this_ptr[stride+0] = vector[2];
-                            this_ptr[stride+1] = vector[3];
+                            vector16 = state->cb2x2[data_byte];
+                            this_ptr[0] = vector16[0];
+                            this_ptr[1] = vector16[1];
+                            this_ptr[stride+0] = vector16[2];
+                            this_ptr[stride+1] = vector16[3];
 
                             GET_BYTE(data_byte);
-                            vector = state->cb2x2[data_byte];
-                            this_ptr[2] = vector[0];
-                            this_ptr[3] = vector[1];
-                            this_ptr[stride+2] = vector[2];
-                            this_ptr[stride+3] = vector[3];
+                            vector16 = state->cb2x2[data_byte];
+                            this_ptr[2] = vector16[0];
+                            this_ptr[3] = vector16[1];
+                            this_ptr[stride+2] = vector16[2];
+                            this_ptr[stride+3] = vector16[3];
 
                             break;
                         }
@@ -372,7 +349,7 @@ int dreamroq_play(char *filename, int loop,
     int framerate;
     int chunk_id;
     unsigned int chunk_size;
-    int chunk_arg;
+    unsigned int chunk_arg;
     roq_state state;
     int status;
     int initialized = 0;
