@@ -16,8 +16,8 @@ static int render_cb(unsigned short *buf, int width, int height, int stride,
     int texture_height)
 {
     pvr_poly_cxt_t cxt;
-    pvr_poly_hdr_t hdr;
-    pvr_vertex_t vert;
+    static pvr_poly_hdr_t hdr[2];
+    static pvr_vertex_t vert[4];
 
     float ratio;
     /* screen coordinates of upper left and bottom right corners */
@@ -34,6 +34,12 @@ static int render_cb(unsigned short *buf, int width, int height, int stride,
             return ROQ_RENDER_PROBLEM;
         }
 
+        /* Precompile the poly headers */
+        pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY, PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED, stride, texture_height, textures[0], PVR_FILTER_NONE);
+        pvr_poly_compile(&hdr[0], &cxt);
+        pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY, PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED, stride, texture_height, textures[1], PVR_FILTER_NONE);
+        pvr_poly_compile(&hdr[1], &cxt);
+
         /* this only works if width ratio <= height ratio */
         ratio = 640.0 / width;
         ul_x = 0;
@@ -41,54 +47,48 @@ static int render_cb(unsigned short *buf, int width, int height, int stride,
         ul_y = ((480 - ratio * height) / 2);
         br_y = ul_y + ratio * texture_height;
 
+        /* Things common to vertices */
+        vert[0].z     = vert[1].z     = vert[2].z     = vert[3].z     = 1.0f; 
+        vert[0].argb  = vert[1].argb  = vert[2].argb  = vert[3].argb  = PVR_PACK_COLOR(1.0f, 1.0f, 1.0f, 1.0f);    
+        vert[0].oargb = vert[1].oargb = vert[2].oargb = vert[3].oargb = 0;  
+        vert[0].flags = vert[1].flags = vert[2].flags = PVR_CMD_VERTEX;         
+        vert[3].flags = PVR_CMD_VERTEX_EOL; 
+
+        vert[0].x = ul_x;
+        vert[0].y = ul_y;
+        vert[0].u = 0.0;
+        vert[0].v = 0.0;
+
+        vert[1].x = br_x;
+        vert[1].y = ul_y;
+        vert[1].u = 1.0;
+        vert[1].v = 0.0;
+
+        vert[2].x = ul_x;
+        vert[2].y = br_y;
+        vert[2].u = 0.0;
+        vert[2].v = 1.0;
+
+        vert[3].x = br_x;
+        vert[3].y = br_y;
+        vert[3].u = 1.0;
+        vert[3].v = 1.0;
+
         graphics_initialized = 1;
     }
 
     /* send the video frame as a texture over to video RAM */
-    pvr_txr_load_ex(buf, textures[current_frame], stride, texture_height,
-        PVR_TXRLOAD_16BPP);
+    pvr_txr_load(buf, textures[current_frame], stride * texture_height * 2);
 
     pvr_wait_ready();
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_OP_POLY);
 
-    pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY, PVR_TXRFMT_RGB565, stride, 
-      texture_height, textures[current_frame], PVR_FILTER_NONE);
-    pvr_poly_compile(&hdr, &cxt);
-    pvr_prim(&hdr, sizeof(hdr));
-
-    vert.argb = PVR_PACK_COLOR(1.0f, 1.0f, 1.0f, 1.0f);
-    vert.oargb = 0;
-    vert.flags = PVR_CMD_VERTEX;
-
-    vert.x = ul_x;
-    vert.y = ul_y;
-    vert.z = 1;
-    vert.u = 0.0;
-    vert.v = 0.0;
-    pvr_prim(&vert, sizeof(vert));
-
-    vert.x = br_x;
-    vert.y = ul_y;
-    vert.z = 1;
-    vert.u = 1.0;
-    vert.v = 0.0;
-    pvr_prim(&vert, sizeof(vert));
-
-    vert.x = ul_x;
-    vert.y = br_y;
-    vert.z = 1;
-    vert.u = 0.0;
-    vert.v = 1.0;
-    pvr_prim(&vert, sizeof(vert));
-
-    vert.x = br_x;
-    vert.y = br_y;
-    vert.z = 1;
-    vert.u = 1.0;
-    vert.v = 1.0;
-    vert.flags = PVR_CMD_VERTEX_EOL;
-    pvr_prim(&vert, sizeof(vert));
+    pvr_prim(&hdr[current_frame], sizeof(pvr_poly_hdr_t));
+    pvr_prim(&vert[0], sizeof(pvr_vertex_t));
+    pvr_prim(&vert[1], sizeof(pvr_vertex_t));
+    pvr_prim(&vert[2], sizeof(pvr_vertex_t));
+    pvr_prim(&vert[3], sizeof(pvr_vertex_t));
 
     pvr_list_finish();
     pvr_scene_finish();
