@@ -25,7 +25,7 @@ typedef int (*render_callback)(unsigned short *buf, int width, int height,
     int stride, int texture_height);
 
 /* The library calls this function to ask whether it should quit playback.
- * Return non-zero if it's time to quite. */
+ * Return non-zero if it's time to quit. */
 typedef int (*quit_callback)();
 
 int dreamroq_play(char *filename, int loop,
