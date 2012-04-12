@@ -159,7 +159,6 @@ static int roq_unpack_vq(unsigned char *buf, int size, unsigned int arg,
     unsigned short *this_ptr;
     unsigned int *this_ptr32;
     unsigned short *last_ptr;
-    unsigned int *last_ptr32;
     unsigned short *vector16;
     unsigned int *vector32;
     int stride32 = stride / 2;
