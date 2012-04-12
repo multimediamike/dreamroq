@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 
     if (argc < 2)
     {
-        printf("USAGE: newroq-cli <file.roq>\n");
+        printf("USAGE: test-dreamroq <file.roq>\n");
         return 1;
     }
 
