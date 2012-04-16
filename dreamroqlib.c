@@ -1,5 +1,6 @@
 /*
  * Dreamroq by Mike Melanson
+ * Audio support by Josh Pearson
  * 
  * This is the main playback engine.
  */
@@ -25,6 +26,16 @@
 #define MAX_BUF_SIZE (64 * 1024)
 
 #define ROQ_CODEBOOK_SIZE 256
+#define SQR_ARRAY_SIZE 256
+
+struct roq_audio
+{
+     int pcm_samples;
+     int channels;
+     int position;
+     short snd_sqr_array[SQR_ARRAY_SIZE];
+     unsigned char pcm_sample[MAX_BUF_SIZE];
+} roq_audio;
 
 typedef struct
 {
@@ -340,8 +351,8 @@ static int roq_unpack_vq(unsigned char *buf, int size, unsigned int arg,
     return status;
 }
 
-int dreamroq_play(char *filename, int loop,
-    render_callback render_cb, quit_callback quit_cb)
+int dreamroq_play(char *filename, int loop, render_callback render_cb,
+                  audio_callback audio_cb, quit_callback quit_cb)
 {
     FILE *f;
     size_t file_ret;
@@ -353,6 +364,7 @@ int dreamroq_play(char *filename, int loop,
     int status;
     int initialized = 0;
     unsigned char read_buffer[MAX_BUF_SIZE];
+    int i, snd_left, snd_right;
 
     f = fopen(filename, "rb");
     if (!f)
@@ -362,6 +374,7 @@ int dreamroq_play(char *filename, int loop,
     if (file_ret != 1)
     {
         fclose(f);
+        printf("\nROQ_FILE_READ_FAILURE\n\n");
         return ROQ_FILE_READ_FAILURE;
     }
     chunk_id   = LE_16(&read_buffer[0]);
@@ -373,6 +386,13 @@ int dreamroq_play(char *filename, int loop,
     }
     framerate = LE_16(&read_buffer[6]);
     printf("RoQ file plays at %d frames/sec\n", framerate);
+    
+    /* Initialize Audio SQRT Look-Up Table */
+    for(i = 0; i < 128; i++)
+    {
+        roq_audio.snd_sqr_array[i] = i * i;
+        roq_audio.snd_sqr_array[i + 128] = -(i * i);
+    }
 
     status = ROQ_SUCCESS;
     while (!feof(f) && status == ROQ_SUCCESS)
@@ -421,8 +441,11 @@ int dreamroq_play(char *filename, int loop,
 
         file_ret = fread(read_buffer, chunk_size, 1, f);
         if (file_ret != 1)
+        {
+            status = ROQ_FILE_READ_FAILURE;
             break;
-
+        }
+            
         switch(chunk_id)
         {
         case RoQ_INFO:
@@ -491,9 +514,37 @@ int dreamroq_play(char *filename, int loop,
             break;
 
         case RoQ_SOUND_MONO:
+            roq_audio.channels = 1;
+            roq_audio.pcm_samples = chunk_size*2;
+            snd_left = chunk_arg;
+            for(i = 0; i < chunk_size; i++)
+            {
+                snd_left += roq_audio.snd_sqr_array[read_buffer[i]];
+                roq_audio.pcm_sample[i * 2] = snd_left & 0xff;
+                roq_audio.pcm_sample[i * 2 + 1] = (snd_left & 0xff00) >> 8;
+            }
+            if (audio_cb)
+                status = audio_cb( roq_audio.pcm_sample, roq_audio.pcm_samples,
+                                   roq_audio.channels ); 
             break;
 
         case RoQ_SOUND_STEREO:
+            roq_audio.channels = 2;
+            roq_audio.pcm_samples = chunk_size*2;
+            snd_left = (chunk_arg & 0xFF00);
+            snd_right = (chunk_arg & 0xFF) << 8;
+            for(i = 0; i < chunk_size; i += 2)
+            {
+                snd_left  += roq_audio.snd_sqr_array[read_buffer[i]];
+                snd_right += roq_audio.snd_sqr_array[read_buffer[i+1]];
+                roq_audio.pcm_sample[i * 2] = snd_left & 0xff;
+                roq_audio.pcm_sample[i * 2 + 1] = (snd_left & 0xff00) >> 8;
+                roq_audio.pcm_sample[i * 2 + 2] =  snd_right & 0xff;
+                roq_audio.pcm_sample[i * 2 + 3] = (snd_right & 0xff00) >> 8;
+            }
+            if (audio_cb)
+                status = audio_cb( roq_audio.pcm_sample, roq_audio.pcm_samples,
+                                   roq_audio.channels );
             break;
 
         default:

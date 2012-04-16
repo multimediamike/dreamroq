@@ -24,11 +24,14 @@
 typedef int (*render_callback)(unsigned short *buf, int width, int height,
     int stride, int texture_height);
 
+/* The library calls this function when it has pcm samples ready for output. */
+typedef int (*audio_callback)(unsigned char *buf, int samples, int channels);
+
 /* The library calls this function to ask whether it should quit playback.
  * Return non-zero if it's time to quit. */
 typedef int (*quit_callback)();
 
-int dreamroq_play(char *filename, int loop,
-    render_callback render_cb, quit_callback quit_cb);
+int dreamroq_play(char *filename, int loop, render_callback render_cb,
+                  audio_callback audio_cb, quit_callback quit_cb);
 
 #endif  /* NEWROQ_H */
