@@ -185,20 +185,24 @@ static int roq_unpack_vq(unsigned char *buf, int size, unsigned int arg,
     int motion_x, motion_y;
     unsigned char data_byte;
 
-    mx = (arg >> 8) & 0xFF;
-    my =  arg       & 0xFF;
+    mx = (signed char)(arg >> 8);
+    my = (signed char)arg;
 
-    if (state->current_frame == 1)
+    if (state->current_frame & 1)
     {
-        state->current_frame = 0;
-        this_frame = state->frame[0];
-        last_frame = state->frame[1];
+        this_frame = state->frame[1];
+        last_frame = state->frame[0];
     }
     else
     {
-        state->current_frame = 1;
-        this_frame = state->frame[1];
-        last_frame = state->frame[0];
+        this_frame = state->frame[0];
+        last_frame = state->frame[1];
+    }
+    /* special case for frame 1, which needs to begin with frame 0's data */
+    if (state->current_frame == 1)
+    {
+        memcpy(state->frame[1], state->frame[0],
+            state->texture_height * state->stride * sizeof(unsigned short));
     }
 
     for (mb_y = 0; mb_y < state->mb_height && status == ROQ_SUCCESS; mb_y++)
@@ -509,8 +513,9 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
             status = roq_unpack_vq(read_buffer, chunk_size, 
                 chunk_arg, &state);
             if (render_cb)
-                status = render_cb(state.frame[state.current_frame], 
+                status = render_cb(state.frame[state.current_frame & 1], 
                     state.width, state.height, state.stride, state.texture_height);
+            state.current_frame++;
             break;
 
         case RoQ_SOUND_MONO:
