@@ -44,6 +44,7 @@ typedef struct
     int mb_width;
     int mb_height;
     int mb_count;
+    int alpha;
 
     int current_frame;
     unsigned short *frame[2];
@@ -76,8 +77,12 @@ static int roq_unpack_quad_codebook(unsigned char *buf, int size, int arg,
     if (!count4x4 && count2x2 * 6 < size)
         count4x4 = ROQ_CODEBOOK_SIZE;
 
-    /* size sanity check */
-    if ((count2x2 * 6 + count4x4 * 4) != size)
+    /* size sanity check, taking alpha into account */
+    if (state->alpha && (count2x2 * 10 + count4x4 * 4) != size)
+    {
+        return ROQ_BAD_CODEBOOK;
+    }
+    if (!state->alpha && (count2x2 * 6 + count4x4 * 4) != size)
     {
         return ROQ_BAD_CODEBOOK;
     }
@@ -87,7 +92,11 @@ static int roq_unpack_quad_codebook(unsigned char *buf, int size, int arg,
     {
         /* unpack the YUV components from the bytestream */
         for (j = 0; j < 4; j++)
+        {
             y[j] = *buf++;
+            if (state->alpha)
+                buf++;
+        }
         u  = *buf++;
         v  = *buf++;
 
@@ -456,6 +465,7 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
             if (initialized)
                 continue;
 
+            state.alpha = chunk_arg;
             state.width = LE_16(&read_buffer[0]);
             state.height = LE_16(&read_buffer[2]);
             /* width and height each need to be divisible by 16 */
