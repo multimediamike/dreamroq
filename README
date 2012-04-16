@@ -1,4 +1,4 @@
-Dreamroq by Mike Melanson (mike -at- multimedia.cx)
+Dreamroq Library
 
 Introduction
 ============
@@ -93,3 +93,9 @@ Notably absent is some proper initialization and teardown mechanism.
 Currently, the first call to the render callback initializes the PVR buffers
 but they are never explicitly freed.
 
+
+Credits
+======= 
+Library originally written by Mike Melanson (mike -at- multimedia.cx)
+
+Audio support added by Josh "PH3NOM" Pearson (ph3nom.dcmc@gmail.com)
