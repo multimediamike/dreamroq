@@ -80,8 +80,6 @@ mount point.
 
 Bugs, Issues, and Future Development
 ====================================
-The library only does video playback; no sound right now.
-
 The player is just a proof of concept at this point. It doesn't try to
 render frames with proper timing-- it just plays them as fast as possible
 (which often isn't very fast, mostly due to the I/O bottleneck).
