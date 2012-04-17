@@ -365,7 +365,8 @@ static int roq_unpack_vq(unsigned char *buf, int size, unsigned int arg,
 }
 
 int dreamroq_play(char *filename, int loop, render_callback render_cb,
-                  audio_callback audio_cb, quit_callback quit_cb)
+                  audio_callback audio_cb, quit_callback quit_cb,
+                  finish_callback finish_cb)
 {
     FILE *f;
     size_t file_ret;
@@ -570,6 +571,9 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
     free(state.frame[0]);
     free(state.frame[1]);
     fclose(f);
+
+    if (finish_cb)
+        finish_cb();
 
     return status;
 }

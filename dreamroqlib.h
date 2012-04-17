@@ -31,7 +31,12 @@ typedef int (*audio_callback)(unsigned char *buf, int samples, int channels);
  * Return non-zero if it's time to quit. */
 typedef int (*quit_callback)();
 
+/* The library calls this function to indicate that playback of the movie is
+ * complete. */
+typedef int (*finish_callback)(void);
+
 int dreamroq_play(char *filename, int loop, render_callback render_cb,
-                  audio_callback audio_cb, quit_callback quit_cb);
+                  audio_callback audio_cb, quit_callback quit_cb,
+                  finish_callback finish_cb);
 
 #endif  /* NEWROQ_H */
