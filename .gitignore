@@ -1,3 +1,4 @@
 *.o
 test-dreamroq
 *.pnm
+roq-audio.wav
