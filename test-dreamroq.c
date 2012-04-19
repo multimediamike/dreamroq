@@ -13,13 +13,16 @@ int quit_cb()
     return 0;
 }
 
-int render_cb(unsigned short *buf, int width, int height, int stride,
-    int texture_height)
+int render_cb(void *buf, int width, int height, int stride,
+    int texture_height, int colorspace)
 {
     static int count = 0;
     FILE *out;
     char filename[20];
-    int x, y, pixel;
+    int x, y;
+    unsigned int pixel;
+    unsigned short *buf_rgb565 = (unsigned short*)buf;
+    unsigned int *buf_rgba = (unsigned int*)buf;
 
     sprintf(filename, "%04d.pnm", count);
     printf("writing frame %d to file %s\n", count, filename);
@@ -32,12 +35,25 @@ int render_cb(unsigned short *buf, int width, int height, int stride,
     {
         for (x = 0; x < width; x++)
         {
-            pixel = *buf++;
-            fputc(((pixel >> 11) << 3) & 0xFF, out);  /* red */
-            fputc(((pixel >>  5) << 2) & 0xFF, out);  /* green */
-            fputc(((pixel >>  0) << 3) & 0xFF, out);  /* blue */
+            if (colorspace == ROQ_RGB565)
+            {
+                pixel = *buf_rgb565++;
+                fputc(((pixel >> 11) << 3) & 0xFF, out);  /* red */
+                fputc(((pixel >>  5) << 2) & 0xFF, out);  /* green */
+                fputc(((pixel >>  0) << 3) & 0xFF, out);  /* blue */
+            }
+            else if (colorspace == ROQ_RGBA)
+            {
+                pixel = *buf_rgba++;
+                fputc((pixel >> 24) & 0xFF, out);  /* red */
+                fputc((pixel >> 16) & 0xFF, out);  /* green */
+                fputc((pixel >>  8) & 0xFF, out);  /* blue */
+            }
         }
-        buf += (stride - width);
+        if (colorspace == ROQ_RGB565)
+            buf_rgb565 += (stride - width);
+        else if (colorspace == ROQ_RGBA)
+            buf_rgba += (stride - width);
     }
     fclose(out);
 
@@ -65,7 +81,7 @@ static FILE *wav_output;
 static int data_size = 0;
 static int audio_output_initialized = 0;
 
-int audio_cb(unsigned char *buf, int samples, int channels)
+int audio_cb(unsigned char *buf_rgb565, int samples, int channels)
 {
     int byte_rate;
 
@@ -96,7 +112,7 @@ int audio_cb(unsigned char *buf, int samples, int channels)
     }
 
     /* dump the data and account for the amount */
-    if (fwrite(buf, samples, 1, wav_output) != 1)
+    if (fwrite(buf_rgb565, samples, 1, wav_output) != 1)
     {
         fclose(wav_output);
         return ROQ_CLIENT_PROBLEM;
@@ -110,8 +126,9 @@ int finish_cb()
 {
     if (audio_output_initialized)
     {
-        printf("finishing playback, wrote %d (0x%X) bytes\n", data_size, data_size);
-        /* rewind and write out the data size and file length parameters */
+        /* rewind and rewrite the header with the known parameters */
+        printf("Wrote %d (0x%X) bytes to %s\n", data_size, data_size,
+            AUDIO_FILENAME);
         fseek(wav_output, 0, SEEK_SET);
         wav_header[40] = (data_size >>  0) & 0xFF;
         wav_header[41] = (data_size >>  8) & 0xFF;
@@ -142,7 +159,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    status = dreamroq_play(argv[1], 0, render_cb, audio_cb, quit_cb, finish_cb);
+    status = dreamroq_play(argv[1], 0, render_cb, audio_cb, quit_cb, finish_cb, ROQ_RGBA);
     printf("final status = %d\n", status);
 
     return status;

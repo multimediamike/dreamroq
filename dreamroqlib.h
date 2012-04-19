@@ -20,9 +20,12 @@
 #define ROQ_RENDER_PROBLEM    9
 #define ROQ_CLIENT_PROBLEM    10
 
+#define ROQ_RGB565 0
+#define ROQ_RGBA   1
+
 /* The library calls this function when it has a frame ready for display. */
-typedef int (*render_callback)(unsigned short *buf, int width, int height,
-    int stride, int texture_height);
+typedef int (*render_callback)(void *buf, int width, int height,
+    int stride, int texture_height, int colorspace);
 
 /* The library calls this function when it has pcm samples ready for output. */
 typedef int (*audio_callback)(unsigned char *buf, int samples, int channels);
@@ -37,6 +40,6 @@ typedef int (*finish_callback)(void);
 
 int dreamroq_play(char *filename, int loop, render_callback render_cb,
                   audio_callback audio_cb, quit_callback quit_cb,
-                  finish_callback finish_cb);
+                  finish_callback finish_cb, int colorspace);
 
 #endif  /* NEWROQ_H */
