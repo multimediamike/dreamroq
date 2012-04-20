@@ -14,8 +14,10 @@
 #define RoQ_INFO           0x1001
 #define RoQ_QUAD_CODEBOOK  0x1002
 #define RoQ_QUAD_VQ        0x1011
+#define RoQ_JPEG           0x1012
 #define RoQ_SOUND_MONO     0x1020
 #define RoQ_SOUND_STEREO   0x1021
+#define RoQ_PACKET         0x1030
 #define RoQ_SIGNATURE      0x1084
 
 #define CHUNK_HEADER_SIZE 8
@@ -844,6 +846,9 @@ int dreamroq_play(char *filename, int colorspace, int loop,
             state.current_frame++;
             break;
 
+        case RoQ_JPEG:
+            break;
+
         case RoQ_SOUND_MONO:
             roq_audio.channels = 1;
             roq_audio.pcm_samples = chunk_size*2;
@@ -876,6 +881,10 @@ int dreamroq_play(char *filename, int colorspace, int loop,
             if (cbs->audio_cb)
                 status = cbs->audio_cb( roq_audio.pcm_sample, roq_audio.pcm_samples,
                                    roq_audio.channels );
+            break;
+
+        case RoQ_PACKET:
+            /* still unimplemented */
             break;
 
         default:
