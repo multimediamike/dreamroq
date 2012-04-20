@@ -152,6 +152,7 @@ int finish_cb()
 int main(int argc, char *argv[])
 {
     int status;
+    roq_callbacks_t cbs;
 
     if (argc < 2)
     {
@@ -159,7 +160,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    status = dreamroq_play(argv[1], 0, render_cb, audio_cb, quit_cb, finish_cb, ROQ_RGBA);
+    cbs.render_cb = render_cb;
+    cbs.audio_cb = audio_cb;
+    cbs.quit_cb = quit_cb;
+    cbs.finish_cb = finish_cb;
+
+    status = dreamroq_play(argv[1], ROQ_RGBA, 0, &cbs);
     printf("final status = %d\n", status);
 
     return status;

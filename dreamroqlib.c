@@ -659,9 +659,8 @@ static int roq_unpack_vq_rgba(unsigned char *buf, int size, unsigned int arg,
     return status;
 }
 
-int dreamroq_play(char *filename, int loop, render_callback render_cb,
-                  audio_callback audio_cb, quit_callback quit_cb,
-                  finish_callback finish_cb, int colorspace)
+int dreamroq_play(char *filename, int colorspace, int loop,
+    roq_callbacks_t *cbs)
 {
     FILE *f;
     size_t file_ret;
@@ -708,7 +707,7 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
     {
         /* if client program defined a quit callback, check if it's time
          * to quit */
-        if (quit_cb && quit_cb())
+        if (cbs->quit_cb && cbs->quit_cb())
             break;
 
         file_ret = fread(read_buffer, CHUNK_HEADER_SIZE, 1, f);
@@ -837,8 +836,8 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
                 status = roq_unpack_vq_rgba(read_buffer, chunk_size, 
                     chunk_arg, &state);
 
-            if (render_cb)
-                status = render_cb(state.frame[state.current_frame & 1], 
+            if (cbs->render_cb)
+                status = cbs->render_cb(state.frame[state.current_frame & 1], 
                     state.width, state.height, state.stride, state.texture_height,
                     colorspace);
 
@@ -855,9 +854,9 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
                 roq_audio.pcm_sample[i * 2] = snd_left & 0xff;
                 roq_audio.pcm_sample[i * 2 + 1] = (snd_left & 0xff00) >> 8;
             }
-            if (audio_cb)
-                status = audio_cb( roq_audio.pcm_sample, roq_audio.pcm_samples,
-                                   roq_audio.channels ); 
+            if (cbs->audio_cb)
+                status = cbs->audio_cb(roq_audio.pcm_sample, roq_audio.pcm_samples,
+                                   roq_audio.channels); 
             break;
 
         case RoQ_SOUND_STEREO:
@@ -874,8 +873,8 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
                 roq_audio.pcm_sample[i * 2 + 2] =  snd_right & 0xff;
                 roq_audio.pcm_sample[i * 2 + 3] = (snd_right & 0xff00) >> 8;
             }
-            if (audio_cb)
-                status = audio_cb( roq_audio.pcm_sample, roq_audio.pcm_samples,
+            if (cbs->audio_cb)
+                status = cbs->audio_cb( roq_audio.pcm_sample, roq_audio.pcm_samples,
                                    roq_audio.channels );
             break;
 
@@ -888,8 +887,8 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
     free(state.frame[1]);
     fclose(f);
 
-    if (finish_cb)
-        finish_cb();
+    if (cbs->finish_cb)
+        cbs->finish_cb();
 
     return status;
 }

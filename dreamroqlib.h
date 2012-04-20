@@ -38,8 +38,15 @@ typedef int (*quit_callback)();
  * complete. */
 typedef int (*finish_callback)(void);
 
-int dreamroq_play(char *filename, int loop, render_callback render_cb,
-                  audio_callback audio_cb, quit_callback quit_cb,
-                  finish_callback finish_cb, int colorspace);
+typedef struct
+{
+    render_callback render_cb;
+    audio_callback  audio_cb;
+    quit_callback   quit_cb;
+    finish_callback finish_cb;
+} roq_callbacks_t;
+
+int dreamroq_play(char *filename, int colorspace, int loop,
+    roq_callbacks_t *callbacks);
 
 #endif  /* NEWROQ_H */
