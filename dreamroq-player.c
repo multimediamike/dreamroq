@@ -12,17 +12,21 @@
 static pvr_ptr_t textures[2];
 static int current_frame = 0;
 
-static int render_cb(unsigned short *buf, int width, int height, int stride,
-    int texture_height)
+static int render_cb(void *buf_ptr, int width, int height, int stride,
+    int texture_height, int colorspace)
 {
     pvr_poly_cxt_t cxt;
     static pvr_poly_hdr_t hdr[2];
     static pvr_vertex_t vert[4];
+    unsigned short *buf = (unsigned short*)buf_ptr;
 
     float ratio;
     /* screen coordinates of upper left and bottom right corners */
     static int ul_x, ul_y, br_x, br_y;
     static int graphics_initialized = 0;
+
+    if (colorspace != ROQ_RGB565)
+        return ROQ_RENDER_PROBLEM;
 
     /* on first call, initialize textures and drawing coordinates */
     if (!graphics_initialized)
@@ -101,6 +105,11 @@ static int render_cb(unsigned short *buf, int width, int height, int stride,
     return ROQ_SUCCESS;
 }
 
+int audio_cb(unsigned char *buf_rgb565, int samples, int channels)
+{
+    return ROQ_SUCCESS;
+}
+
 static int quit_cb()
 {
     cont_cond_t cont;
@@ -115,14 +124,25 @@ static int quit_cb()
     return (cont.buttons & CONT_START);
 }
 
+int finish_cb()
+{
+    return ROQ_SUCCESS;
+}
+
 int main()
 {
     int status;
+    roq_callbacks_t cbs;
+
+    cbs.render_cb = render_cb;
+    cbs.audio_cb = audio_cb;
+    cbs.quit_cb = quit_cb;
+    cbs.finish_cb = finish_cb;
 
     vid_set_mode(DM_640x480_NTSC_IL, PM_RGB565);
     pvr_init_defaults();
 
-    status = dreamroq_play("/cd/venuscubes.roq", 1, render_cb, quit_cb);
+    status = dreamroq_play("/cd/venuscubes.roq", ROQ_RGB565, 1, &cbs);
     printf("dreamroq_play() status = %d\n", status);
 
     return 0;
