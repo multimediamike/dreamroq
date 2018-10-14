@@ -5,7 +5,7 @@
  * the KallistiOS operating system.
  */
 
-#include "kos.h"
+#include <kos.h>
 
 #include "dreamroqlib.h"
 
@@ -52,11 +52,11 @@ static int render_cb(void *buf_ptr, int width, int height, int stride,
         br_y = ul_y + ratio * texture_height;
 
         /* Things common to vertices */
-        vert[0].z     = vert[1].z     = vert[2].z     = vert[3].z     = 1.0f; 
-        vert[0].argb  = vert[1].argb  = vert[2].argb  = vert[3].argb  = PVR_PACK_COLOR(1.0f, 1.0f, 1.0f, 1.0f);    
-        vert[0].oargb = vert[1].oargb = vert[2].oargb = vert[3].oargb = 0;  
-        vert[0].flags = vert[1].flags = vert[2].flags = PVR_CMD_VERTEX;         
-        vert[3].flags = PVR_CMD_VERTEX_EOL; 
+        vert[0].z     = vert[1].z     = vert[2].z     = vert[3].z     = 1.0f;
+        vert[0].argb  = vert[1].argb  = vert[2].argb  = vert[3].argb  = PVR_PACK_COLOR(1.0f, 1.0f, 1.0f, 1.0f);
+        vert[0].oargb = vert[1].oargb = vert[2].oargb = vert[3].oargb = 0;
+        vert[0].flags = vert[1].flags = vert[2].flags = PVR_CMD_VERTEX;
+        vert[3].flags = PVR_CMD_VERTEX_EOL;
 
         vert[0].x = ul_x;
         vert[0].y = ul_y;
@@ -112,16 +112,19 @@ int audio_cb(unsigned char *buf_rgb565, int samples, int channels)
 
 static int quit_cb()
 {
-    cont_cond_t cont;
-
+    maple_device_t  *cont;     //Controller
+    cont_state_t    *state;    //State of inputs
     /* check controller state */
-    if (cont_get_cond(maple_first_controller(), &cont))
-    {
-        /* controller read error */
-        return 1;
+    state = maple_dev_status(cont);
+
+    // If the state/controller is unavailable
+    if(!state) {
+        printf("Error reading controller\n");
+        return(0);
     }
-    cont.buttons = ~cont.buttons;
-    return (cont.buttons & CONT_START);
+
+    state->buttons = ~state->buttons;
+    return (state->buttons & CONT_START);
 }
 
 int finish_cb()
@@ -142,9 +145,8 @@ int main()
     vid_set_mode(DM_640x480_NTSC_IL, PM_RGB565);
     pvr_init_defaults();
 
-    status = dreamroq_play("/cd/venuscubes.roq", ROQ_RGB565, 1, &cbs);
+    status = dreamroq_play("/cd/cube_v1.roq", ROQ_RGB565, 1, &cbs);
     printf("dreamroq_play() status = %d\n", status);
 
     return 0;
 }
-

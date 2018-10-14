@@ -1,67 +1,24 @@
 /*
  * Dreamroq by Mike Melanson
  * Audio support by Josh Pearson
- * 
+ *
  * This is the main playback engine.
  */
 
+#include <kos.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __cplusplus
+ extern "C" {
+#endif
 #include "dreamroqlib.h"
+#ifdef __cplusplus
+}
+#endif /* extern "C" */
 
-#define RoQ_INFO           0x1001
-#define RoQ_QUAD_CODEBOOK  0x1002
-#define RoQ_QUAD_VQ        0x1011
-#define RoQ_JPEG           0x1012
-#define RoQ_SOUND_MONO     0x1020
-#define RoQ_SOUND_STEREO   0x1021
-#define RoQ_PACKET         0x1030
-#define RoQ_SIGNATURE      0x1084
-
-#define CHUNK_HEADER_SIZE 8
-
-#define LE_16(buf) (*buf | (*(buf+1) << 8))
-#define LE_32(buf) (*buf | (*(buf+1) << 8) | (*(buf+2) << 16) | (*(buf+3) << 24))
-
-#define MAX_BUF_SIZE (64 * 1024)
-
-#define ROQ_CODEBOOK_SIZE 256
-#define SQR_ARRAY_SIZE 256
-
-struct roq_audio
-{
-     int pcm_samples;
-     int channels;
-     int position;
-     short snd_sqr_array[SQR_ARRAY_SIZE];
-     unsigned char pcm_sample[MAX_BUF_SIZE];
-} roq_audio;
-
-typedef struct
-{
-    int width;
-    int height;
-    int mb_width;
-    int mb_height;
-    int mb_count;
-    int alpha;
-
-    int current_frame;
-    unsigned char *frame[2];
-    int stride;
-    int texture_height;
-    int colorspace;
-
-    unsigned short cb2x2_rgb565[ROQ_CODEBOOK_SIZE][4];
-    unsigned short cb4x4_rgb565[ROQ_CODEBOOK_SIZE][16];
-
-    unsigned int cb2x2_rgba[ROQ_CODEBOOK_SIZE][4];
-    unsigned int cb4x4_rgba[ROQ_CODEBOOK_SIZE][16];
-} roq_state;
-
-static int roq_unpack_quad_codebook_rgb565(unsigned char *buf, int size,
+int  roq_unpack_quad_codebook_rgb565(unsigned char *buf, int size,
     int arg, roq_state *state)
 {
     int y[4];
@@ -122,7 +79,7 @@ static int roq_unpack_quad_codebook_rgb565(unsigned char *buf, int size,
             if (b > 31) b = 31;
 
             state->cb2x2_rgb565[i][j] = (
-                (r << 11) | 
+                (r << 11) |
                 (g <<  5) |
                 (b <<  0) );
         }
@@ -144,8 +101,7 @@ static int roq_unpack_quad_codebook_rgb565(unsigned char *buf, int size,
 
     return ROQ_SUCCESS;
 }
-
-static int roq_unpack_quad_codebook_rgba(unsigned char *buf, int size,
+ int  roq_unpack_quad_codebook_rgba(unsigned char *buf, int size,
     int arg, roq_state *state)
 {
     int y[4];
@@ -209,7 +165,7 @@ static int roq_unpack_quad_codebook_rgba(unsigned char *buf, int size,
             if (b > 255) b = 255;
 
             state->cb2x2_rgba[i][j] = (
-                (r << 24) | 
+                (r << 24) |
                 (g << 16) |
                 (b <<  8) |
                  a[j]);
@@ -251,7 +207,7 @@ static int roq_unpack_quad_codebook_rgba(unsigned char *buf, int size,
     mode_count -= 2; \
     mode = (mode_set >> mode_count) & 0x03;
 
-static int roq_unpack_vq_rgb565(unsigned char *buf, int size, unsigned int arg, 
+int  roq_unpack_vq_rgb565(unsigned char *buf, int size, unsigned int arg,
     roq_state *state)
 {
     int status = ROQ_SUCCESS;
@@ -330,7 +286,7 @@ static int roq_unpack_vq_rgb565(unsigned char *buf, int size, unsigned int arg,
                     GET_BYTE(data_byte);
                     motion_x = 8 - (data_byte >>  4) - mx;
                     motion_y = 8 - (data_byte & 0xF) - my;
-                    last_ptr = last_frame + block_offset + 
+                    last_ptr = last_frame + block_offset +
                         (motion_y * stride) + motion_x;
                     this_ptr = this_frame + block_offset;
                     for (i = 0; i < 8; i++)
@@ -379,7 +335,7 @@ static int roq_unpack_vq_rgb565(unsigned char *buf, int size, unsigned int arg,
                             GET_BYTE(data_byte);
                             motion_x = 8 - (data_byte >>  4) - mx;
                             motion_y = 8 - (data_byte & 0xF) - my;
-                            last_ptr = last_frame + subblock_offset + 
+                            last_ptr = last_frame + subblock_offset +
                                 (motion_y * stride) + motion_x;
                             this_ptr = this_frame + subblock_offset;
                             for (i = 0; i < 4; i++)
@@ -458,7 +414,7 @@ static int roq_unpack_vq_rgb565(unsigned char *buf, int size, unsigned int arg,
     return status;
 }
 
-static int roq_unpack_vq_rgba(unsigned char *buf, int size, unsigned int arg, 
+int  roq_unpack_vq_rgba(unsigned char *buf, int size, unsigned int arg,
     roq_state *state)
 {
     int status = ROQ_SUCCESS;
@@ -532,7 +488,7 @@ static int roq_unpack_vq_rgba(unsigned char *buf, int size, unsigned int arg,
                     GET_BYTE(data_byte);
                     motion_x = 8 - (data_byte >>  4) - mx;
                     motion_y = 8 - (data_byte & 0xF) - my;
-                    last_ptr = last_frame + block_offset + 
+                    last_ptr = last_frame + block_offset +
                         (motion_y * stride) + motion_x;
                     this_ptr = this_frame + block_offset;
                     for (i = 0; i < 8; i++)
@@ -581,7 +537,7 @@ static int roq_unpack_vq_rgba(unsigned char *buf, int size, unsigned int arg,
                             GET_BYTE(data_byte);
                             motion_x = 8 - (data_byte >>  4) - mx;
                             motion_y = 8 - (data_byte & 0xF) - my;
-                            last_ptr = last_frame + subblock_offset + 
+                            last_ptr = last_frame + subblock_offset +
                                 (motion_y * stride) + motion_x;
                             this_ptr = this_frame + subblock_offset;
                             for (i = 0; i < 4; i++)
@@ -661,22 +617,23 @@ static int roq_unpack_vq_rgba(unsigned char *buf, int size, unsigned int arg,
     return status;
 }
 
-int dreamroq_play(char *filename, int colorspace, int loop,
-    roq_callbacks_t *cbs)
+
+int dreamroq_play(char *filename, int colorspace, int loop, roq_callbacks_t *cbs)
 {
-    FILE *f;
+    FILE *f = 0;
     size_t file_ret;
     int framerate;
     int chunk_id;
     unsigned int chunk_size;
     unsigned int chunk_arg;
     roq_state state;
+    roq_audio audio;
     int status;
     int initialized = 0;
     unsigned char read_buffer[MAX_BUF_SIZE];
     int i, snd_left, snd_right;
 
-    f = fopen(filename, "rb");
+    f = fopen( filename, "rb");
     if (!f)
         return ROQ_FILE_OPEN_FAILURE;
 
@@ -696,12 +653,12 @@ int dreamroq_play(char *filename, int colorspace, int loop,
     }
     framerate = LE_16(&read_buffer[6]);
     printf("RoQ file plays at %d frames/sec\n", framerate);
-    
+
     /* Initialize Audio SQRT Look-Up Table */
     for(i = 0; i < 128; i++)
     {
-        roq_audio.snd_sqr_array[i] = i * i;
-        roq_audio.snd_sqr_array[i + 128] = -(i * i);
+        audio.snd_sqr_array[i] = i * i;
+        audio.snd_sqr_array[i + 128] = -(i * i);
     }
 
     status = ROQ_SUCCESS;
@@ -755,7 +712,7 @@ int dreamroq_play(char *filename, int colorspace, int loop,
             status = ROQ_FILE_READ_FAILURE;
             break;
         }
-            
+
         state.colorspace = colorspace;
 
         switch(chunk_id)
@@ -792,7 +749,7 @@ int dreamroq_play(char *filename, int colorspace, int loop,
                 while (state.texture_height < state.height)
                     state.texture_height <<= 1;
             }
-            printf("  RoQ_INFO: dimensions = %dx%d, %dx%d; %d mbs, texture = %dx%d\n", 
+            printf("  RoQ_INFO: dimensions = %dx%d, %dx%d; %d mbs, texture = %dx%d\n",
                 state.width, state.height, state.mb_width, state.mb_height,
                 state.mb_count, state.stride, state.texture_height);
             if (colorspace == ROQ_RGB565)
@@ -823,23 +780,23 @@ int dreamroq_play(char *filename, int colorspace, int loop,
 
         case RoQ_QUAD_CODEBOOK:
             if (colorspace == ROQ_RGB565)
-                status = roq_unpack_quad_codebook_rgb565(read_buffer, chunk_size, 
+                status = roq_unpack_quad_codebook_rgb565(read_buffer, chunk_size,
                     chunk_arg, &state);
             else if (colorspace == ROQ_RGBA)
-                status = roq_unpack_quad_codebook_rgba(read_buffer, chunk_size, 
+                status = roq_unpack_quad_codebook_rgba(read_buffer, chunk_size,
                     chunk_arg, &state);
             break;
 
         case RoQ_QUAD_VQ:
             if (colorspace == ROQ_RGB565)
-                status = roq_unpack_vq_rgb565(read_buffer, chunk_size, 
+                status = roq_unpack_vq_rgb565(read_buffer, chunk_size,
                     chunk_arg, &state);
             else if (colorspace == ROQ_RGBA)
-                status = roq_unpack_vq_rgba(read_buffer, chunk_size, 
+                status = roq_unpack_vq_rgba(read_buffer, chunk_size,
                     chunk_arg, &state);
 
             if (cbs->render_cb)
-                status = cbs->render_cb(state.frame[state.current_frame & 1], 
+                status = cbs->render_cb(state.frame[state.current_frame & 1],
                     state.width, state.height, state.stride, state.texture_height,
                     colorspace);
 
@@ -850,37 +807,37 @@ int dreamroq_play(char *filename, int colorspace, int loop,
             break;
 
         case RoQ_SOUND_MONO:
-            roq_audio.channels = 1;
-            roq_audio.pcm_samples = chunk_size*2;
+            audio.channels = 1;
+            audio.pcm_samples = chunk_size*2;
             snd_left = chunk_arg;
             for(i = 0; i < chunk_size; i++)
             {
-                snd_left += roq_audio.snd_sqr_array[read_buffer[i]];
-                roq_audio.pcm_sample[i * 2] = snd_left & 0xff;
-                roq_audio.pcm_sample[i * 2 + 1] = (snd_left & 0xff00) >> 8;
+                snd_left += audio.snd_sqr_array[read_buffer[i]];
+                audio.pcm_sample[i * 2] = snd_left & 0xff;
+                audio.pcm_sample[i * 2 + 1] = (snd_left & 0xff00) >> 8;
             }
             if (cbs->audio_cb)
-                status = cbs->audio_cb(roq_audio.pcm_sample, roq_audio.pcm_samples,
-                                   roq_audio.channels); 
+                status = cbs->audio_cb(audio.pcm_sample, audio.pcm_samples,
+                                   audio.channels);
             break;
 
         case RoQ_SOUND_STEREO:
-            roq_audio.channels = 2;
-            roq_audio.pcm_samples = chunk_size*2;
+            audio.channels = 2;
+            audio.pcm_samples = chunk_size*2;
             snd_left = (chunk_arg & 0xFF00);
             snd_right = (chunk_arg & 0xFF) << 8;
             for(i = 0; i < chunk_size; i += 2)
             {
-                snd_left  += roq_audio.snd_sqr_array[read_buffer[i]];
-                snd_right += roq_audio.snd_sqr_array[read_buffer[i+1]];
-                roq_audio.pcm_sample[i * 2] = snd_left & 0xff;
-                roq_audio.pcm_sample[i * 2 + 1] = (snd_left & 0xff00) >> 8;
-                roq_audio.pcm_sample[i * 2 + 2] =  snd_right & 0xff;
-                roq_audio.pcm_sample[i * 2 + 3] = (snd_right & 0xff00) >> 8;
+                snd_left  += audio.snd_sqr_array[read_buffer[i]];
+                snd_right += audio.snd_sqr_array[read_buffer[i+1]];
+                audio.pcm_sample[i * 2] = snd_left & 0xff;
+                audio.pcm_sample[i * 2 + 1] = (snd_left & 0xff00) >> 8;
+                audio.pcm_sample[i * 2 + 2] =  snd_right & 0xff;
+                audio.pcm_sample[i * 2 + 3] = (snd_right & 0xff00) >> 8;
             }
             if (cbs->audio_cb)
-                status = cbs->audio_cb( roq_audio.pcm_sample, roq_audio.pcm_samples,
-                                   roq_audio.channels );
+                status = cbs->audio_cb( audio.pcm_sample, audio.pcm_samples,
+                                   audio.channels );
             break;
 
         case RoQ_PACKET:
@@ -901,4 +858,3 @@ int dreamroq_play(char *filename, int colorspace, int loop,
 
     return status;
 }
-
