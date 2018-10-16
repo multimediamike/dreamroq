@@ -13,16 +13,13 @@ int quit_cb()
     return 0;
 }
 
-int render_cb(void *buf, int width, int height, int stride,
-    int texture_height, int colorspace)
+int render_cb(unsigned short *buf, int width, int height, int stride,
+    int texture_height)
 {
     static int count = 0;
     FILE *out;
     char filename[20];
-    int x, y;
-    unsigned int pixel;
-    unsigned short *buf_rgb565 = (unsigned short*)buf;
-    unsigned int *buf_rgba = (unsigned int*)buf;
+    int x, y, pixel;
 
     sprintf(filename, "%04d.pnm", count);
     printf("writing frame %d to file %s\n", count, filename);
@@ -35,116 +32,14 @@ int render_cb(void *buf, int width, int height, int stride,
     {
         for (x = 0; x < width; x++)
         {
-            if (colorspace == ROQ_RGB565)
-            {
-                pixel = *buf_rgb565++;
-                fputc(((pixel >> 11) << 3) & 0xFF, out);  /* red */
-                fputc(((pixel >>  5) << 2) & 0xFF, out);  /* green */
-                fputc(((pixel >>  0) << 3) & 0xFF, out);  /* blue */
-            }
-            else if (colorspace == ROQ_RGBA)
-            {
-                pixel = *buf_rgba++;
-                fputc((pixel >> 24) & 0xFF, out);  /* red */
-                fputc((pixel >> 16) & 0xFF, out);  /* green */
-                fputc((pixel >>  8) & 0xFF, out);  /* blue */
-            }
+            pixel = *buf++;
+            fputc(((pixel >> 11) << 3) & 0xFF, out);  /* red */
+            fputc(((pixel >>  5) << 2) & 0xFF, out);  /* green */
+            fputc(((pixel >>  0) << 3) & 0xFF, out);  /* blue */
         }
-        if (colorspace == ROQ_RGB565)
-            buf_rgb565 += (stride - width);
-        else if (colorspace == ROQ_RGBA)
-            buf_rgba += (stride - width);
+        buf += (stride - width);
     }
     fclose(out);
-
-    return ROQ_SUCCESS;
-}
-
-#define AUDIO_FILENAME "roq-audio.wav"
-static char wav_header[] = {
-    'R', 'I', 'F', 'F',  /* RIFF header */
-      0,   0,   0,   0,  /* file size will be filled in later */
-    'W', 'A', 'V', 'E',  /* more header stuff */
-    'f', 'm', 't', 0x20,
-    0x10,  0,   0,   0,  /* length of format chunk */
-      1,   0,            /* format = 1 (PCM) */
-      0,   0,            /* channel count will be filled in later */
-    0x22, 0x56, 0,   0,  /* frequency is always 0x5622 = 22050 Hz */
-      0,   0,   0,   0,  /* byte rate will be filled in later */
-      1,   0, 0x10,  0,  /* data alignment and bits per sample */
-    'd', 'a', 't', 'a',  /* start of data chunk */
-      0,   0,   0,   0   /* data block size will be filled in later */
-};
-#define WAV_HEADER_SIZE 44
-#define SAMPLE_RATE 22050
-static FILE *wav_output;
-static int data_size = 0;
-static int audio_output_initialized = 0;
-
-int audio_cb(unsigned char *buf_rgb565, int samples, int channels)
-{
-    int byte_rate;
-
-    if (!audio_output_initialized)
-    {
-        wav_output = fopen(AUDIO_FILENAME, "wb");
-        if (!wav_output)
-            return ROQ_CLIENT_PROBLEM;
-
-        /* fill in channels and data rate fields */
-        if (channels != 1 && channels != 2)
-            return ROQ_CLIENT_PROBLEM;
-        wav_header[22] = channels;
-        byte_rate = SAMPLE_RATE * 2 * channels;
-        wav_header[0x1C] = (byte_rate >>  0) & 0xFF;
-        wav_header[0x1D] = (byte_rate >>  8) & 0xFF;
-        wav_header[0x1E] = (byte_rate >> 16) & 0xFF;
-        wav_header[0x1F] = (byte_rate >> 24) & 0xFF;
-
-        /* write the header */
-        if (fwrite(wav_header, WAV_HEADER_SIZE, 1, wav_output) != 1)
-        {
-            fclose(wav_output);
-            return ROQ_CLIENT_PROBLEM;
-        }
-
-        audio_output_initialized = 1;
-    }
-
-    /* dump the data and account for the amount */
-    if (fwrite(buf_rgb565, samples, 1, wav_output) != 1)
-    {
-        fclose(wav_output);
-        return ROQ_CLIENT_PROBLEM;
-    }
-    data_size += samples;
-
-    return ROQ_SUCCESS;
-}
-
-int finish_cb()
-{
-    if (audio_output_initialized)
-    {
-        /* rewind and rewrite the header with the known parameters */
-        printf("Wrote %d (0x%X) bytes to %s\n", data_size, data_size,
-            AUDIO_FILENAME);
-        fseek(wav_output, 0, SEEK_SET);
-        wav_header[40] = (data_size >>  0) & 0xFF;
-        wav_header[41] = (data_size >>  8) & 0xFF;
-        wav_header[42] = (data_size >> 16) & 0xFF;
-        wav_header[43] = (data_size >> 24) & 0xFF;
-        data_size += WAV_HEADER_SIZE - 8;
-        wav_header[4] = (data_size >>  0) & 0xFF;
-        wav_header[5] = (data_size >>  8) & 0xFF;
-        wav_header[6] = (data_size >> 16) & 0xFF;
-        wav_header[7] = (data_size >> 24) & 0xFF;
-        if (fwrite(wav_header, WAV_HEADER_SIZE, 1, wav_output) != 1)
-        {
-            fclose(wav_output);
-            return ROQ_CLIENT_PROBLEM;
-        }
-    }
 
     return ROQ_SUCCESS;
 }
@@ -152,20 +47,14 @@ int finish_cb()
 int main(int argc, char *argv[])
 {
     int status;
-    roq_callbacks_t cbs;
 
     if (argc < 2)
     {
-        printf("USAGE: test-dreamroq <file.roq>\n");
+        printf("USAGE: newroq-cli <file.roq>\n");
         return 1;
     }
 
-    cbs.render_cb = render_cb;
-    cbs.audio_cb = audio_cb;
-    cbs.quit_cb = quit_cb;
-    cbs.finish_cb = finish_cb;
-
-    status = dreamroq_play(argv[1], ROQ_RGBA, 0, &cbs);
+    status = dreamroq_play(argv[1], 0, render_cb, 0, quit_cb);
     printf("final status = %d\n", status);
 
     return status;
