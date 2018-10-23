@@ -97,14 +97,15 @@ static void *video_thd(void *ptr)
 {
     render_thd=1;  /* Signal Thread is active */
 
-    /* Match the Auido and Video Time Stamps */
+    /* Match the Audio and Video Time Stamps */
     VTS = ++frame / VIDEO_RATE;
     while( ATS < VTS ) thd_pass();
 
     /* Draw the frame using the PVR */
     pvr_draw_frame_dma(&roq_vram_ptr);
-    printf("Rendered Frame %u\n", frame);
+    //printf("Rendered Frame %u\n", frame);
     render_thd=0;   /* Signal Thread is finished */
+    return NULL;
 }
 
 static int render_cb(unsigned short *buf, int width, int height, int stride,
@@ -123,11 +124,14 @@ static int render_cb(unsigned short *buf, int width, int height, int stride,
            PVR_LIST_OP_POLY, PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED, 10.0f);
 
         graphics_initialized = 1;
+         printf("Graphics initialized\n");
     }
 
     /* Wait for last frame to finish render */
-    while(render_thd)
-       thd_pass();
+      while(render_thd){
+        //printf("Still rendering");
+        thd_pass();
+     }
 
     /* Current decoded frame */
     pvr_dma_load( (unsigned char *)buf, &roq_vram_ptr);
@@ -135,6 +139,7 @@ static int render_cb(unsigned short *buf, int width, int height, int stride,
     /* Create a thread to render the current frame */
     //Try 1 onr 0 for first arg
     render_thread = thd_create(0, video_thd, NULL);
+    printf("Render Thread Active %d\n", render_thd);
 
     return ROQ_SUCCESS;
 }
@@ -143,8 +148,10 @@ maple_device_t  *cont;     //Controller
 cont_state_t    *state;    //State of inputs
 static int quit_cb()
 {
+
+    /*
     cont = maple_enum_type(0, MAPLE_FUNC_CONTROLLER);
-    /* check controller state */
+    // check controller state
     state = maple_dev_status(cont);
 
     // If the state/controller is unavailable
@@ -155,6 +162,8 @@ static int quit_cb()
 
     state->buttons = ~state->buttons;
     return (state->buttons & CONT_START);
+    */
+    return ROQ_SUCCESS;
 }
 
 int main()
@@ -168,7 +177,7 @@ int main()
     printf("dreamroq_play(C) Multimedia Mike Melanson & Josh PH3NOM Pearson 2011\n");
 
     /* To disable a callback, simply replace the function name by 0 */
-    status = dreamroq_play("/cd/sample.roq", 1, render_cb, 0, 0);
+    status = dreamroq_play("/cd/id_soft.roq", 1, render_cb, audio_cb, quit_cb);
 
     printf("dreamroq_play() status = %d\n", status);
 

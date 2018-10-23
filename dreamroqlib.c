@@ -511,6 +511,7 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
                 free (state.frame[0]);
                 free (state.frame[1]);
                 status = ROQ_NO_MEMORY;
+                printf("  RoQ_INFO:  NO_MEMORY");
                 break;
             }
             memset(state.frame[0], 0, state.texture_height * state.stride * sizeof(unsigned short));
@@ -518,12 +519,14 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
 
             /* set this flag so that this code is not executed again when
              * looping */
+            printf("  RoQ_INFO: Info initialized\n");
             initialized = 1;
             break;
 
         case RoQ_QUAD_CODEBOOK:
             status = roq_unpack_quad_codebook(read_buffer, chunk_size,
                 chunk_arg, &state);
+            printf("  RoQ_QUAD:  unpack status = %d (0 = succes)\n", status);
             break;
 
         case RoQ_QUAD_VQ:
@@ -532,6 +535,7 @@ int dreamroq_play(char *filename, int loop, render_callback render_cb,
             if (render_cb)
                 status = render_cb(state.frame[state.current_frame],
                     state.width, state.height, state.stride, state.texture_height);
+            printf("  RoQ_QUAD_VQ:  unpack status = %d (0 = succes)\n", status);
             break;
 
         case RoQ_SOUND_MONO:

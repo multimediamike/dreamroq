@@ -39,6 +39,8 @@ cd: $(TARGET)
 	@mkisofs -C 0,11702 -V Reaperi_Cycle -G $(KOS_BASE)/IP.BIN -r -J -l -m '*.o' -o ../$(PROJECT_NAME).iso $(DIR)
 	@$(KOS_BASE)/utils/cdi4dc/cdi4dc ../$(PROJECT_NAME).iso ../$(PROJECT_NAME).cdi -d > cdi4dc.log
 	../redream ../$(PROJECT_NAME).cdi
+	#sudo arp -s 192.168.0.99 00:d0:f1:03:14:02
+	#sudo ../dc-tool-ip -t dreamcast -c ./ -x dreamroq-player.elf
 
 dist:
 	rm -f $(OBJS) romdisk.o romdisk.img
