@@ -8,6 +8,7 @@
 #ifndef NEWROQ_H
 #define NEWROQ_H
 
+#define ROQ_EXIT              0
 #define ROQ_SUCCESS           0
 #define ROQ_FILE_OPEN_FAILURE 1
 #define ROQ_FILE_READ_FAILURE 2
@@ -20,33 +21,18 @@
 #define ROQ_RENDER_PROBLEM    9
 #define ROQ_CLIENT_PROBLEM    10
 
-#define ROQ_RGB565 0
-#define ROQ_RGBA   1
-
 /* The library calls this function when it has a frame ready for display. */
-typedef int (*render_callback)(void *buf, int width, int height,
-    int stride, int texture_height, int colorspace);
+typedef int (*render_callback)(unsigned short *buf, int width, int height,
+    int stride, int texture_height);
 
 /* The library calls this function when it has pcm samples ready for output. */
 typedef int (*audio_callback)(unsigned char *buf, int samples, int channels);
 
 /* The library calls this function to ask whether it should quit playback.
- * Return non-zero if it's time to quit. */
+ * Return non-zero if it's time to quite. */
 typedef int (*quit_callback)();
 
-/* The library calls this function to indicate that playback of the movie is
- * complete. */
-typedef int (*finish_callback)(void);
-
-typedef struct
-{
-    render_callback render_cb;
-    audio_callback  audio_cb;
-    quit_callback   quit_cb;
-    finish_callback finish_cb;
-} roq_callbacks_t;
-
-int dreamroq_play(char *filename, int colorspace, int loop,
-    roq_callbacks_t *callbacks);
+int dreamroq_play(char *filename, int loop, render_callback render_cb,
+                  audio_callback audio_cb, quit_callback quit_cb);
 
 #endif  /* NEWROQ_H */

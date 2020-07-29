@@ -2,3 +2,5 @@
 test-dreamroq
 *.pnm
 roq-audio.wav
+*.iso
+*.gch
